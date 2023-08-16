@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Identity.Client;
 using Notes_Backend.API.Data;
 using Notes_Backend.API.Models.Entities;
+using System;
+using System.Threading.Tasks;
 
 namespace Notes_Backend.API.Controllers
 {
@@ -10,71 +11,83 @@ namespace Notes_Backend.API.Controllers
     [Route("api/[controller]")]
     public class NotesController : Controller
     {
-        private NotesDbContext notesDbContext;
-        public NotesController(NotesDbContext notesDbContext)
+        private readonly NotesDbContext _dbContext;
+
+        public NotesController(NotesDbContext dbContext)
         {
-            this.notesDbContext = notesDbContext;  
-        }
-        [HttpGet]
-         public async Task<IActionResult> GetAllNotes()
-        {
-            //Get nodes from the database
-            return Ok(await notesDbContext.Notes.ToListAsync());
+            _dbContext = dbContext;
         }
 
         [HttpGet]
-        [Route("{id}")]
-        //[ActionName("GetNoteById")]
+        public async Task<IActionResult> GetAllNotes()
+        {
+            // Retrieve all notes from the database
+            var notes = await _dbContext.Notes.ToListAsync();
+            return Ok(notes);
+        }
+
+        [HttpGet]
+        [Route("{id:Guid}")]
         public async Task<IActionResult> GetNoteById(Guid id)
         {
-             var note = await notesDbContext.Notes.FirstOrDefaultAsync(x => x.Id == id);
-            if(note==null)
-            {
-                return NotFound();
-            }
-            return Ok(note);
-        }
+            // Retrieve a note by its ID from the database
+            var note = await _dbContext.Notes.FirstOrDefaultAsync(x => x.Id == id);
 
-        [HttpPost]
-        public async Task<IActionResult> AddNote(Note note)
-        {
-            note.Id = Guid.NewGuid();
-            await notesDbContext.Notes.AddAsync(note);
-            await notesDbContext.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetNoteById),new {id = note.Id},note);
-        }
-
-        [HttpPut]
-        [Route("{id:Guid}")]
-        public async Task<ActionResult> UpdateNote(Guid id, Note updatedNote)
-        {
-            var note = await notesDbContext.Notes.FirstOrDefaultAsync(x => x.Id == id);
             if (note == null)
             {
                 return NotFound();
             }
-            else
-            {
-                note.Title = updatedNote.Title;
-                note.Description = updatedNote.Description; 
-                note.IsVisible = updatedNote.IsVisible;
-                await notesDbContext.SaveChangesAsync();
-                return Ok(note);
-            }
+
+            return Ok(note);
         }
+
+        [HttpPost]
+        public async Task<IActionResult> AddNote([FromBody] Note note)
+        {
+            // Add a new note to the database
+            note.Id = Guid.NewGuid();
+            await _dbContext.Notes.AddAsync(note);
+            await _dbContext.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetNoteById), new { id = note.Id }, note);
+        }
+
+        [HttpPut]
+        [Route("{id:Guid}")]
+        public async Task<IActionResult> UpdateNote(Guid id, [FromBody] Note updatedNote)
+        {
+            // Update an existing note in the database
+            var note = await _dbContext.Notes.FirstOrDefaultAsync(x => x.Id == id);
+
+            if (note == null)
+            {
+                return NotFound();
+            }
+
+            note.Title = updatedNote.Title;
+            note.Description = updatedNote.Description;
+            note.IsVisible = updatedNote.IsVisible;
+
+            await _dbContext.SaveChangesAsync();
+            return Ok(note);
+        }
+
         [HttpDelete]
         [Route("{id:Guid}")]
         public async Task<IActionResult> DeleteNote(Guid id)
         {
-            Note note = await notesDbContext.Notes.FirstOrDefaultAsync(x=>x.Id == id);
-            if(note == null)
+            // Delete a note from the database
+            var note = await _dbContext.Notes.FirstOrDefaultAsync(x => x.Id == id);
+
+            if (note == null)
             {
                 return NotFound();
             }
-            notesDbContext.Notes.Remove(note);
-            await notesDbContext.SaveChangesAsync();
+
+            _dbContext.Notes.Remove(note);
+            await _dbContext.SaveChangesAsync();
+
             return Ok();
         }
-
     }
 }
